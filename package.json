@@ -1,5 +1,5 @@
 {
-  "name": "arduino-firmata",
+  "name": "arduino-firmata-electron",
   "private": false,
   "version": "0.3.1",
   "description": "Arduino Firmata implementation for Node.js",
@@ -28,7 +28,7 @@
   "author": "Sho Hashimoto <hashimoto@shokai.org>",
   "license": "MIT",
   "dependencies": {
-    "serialport": "*",
+    "serialport-electron": "latest",
     "eventemitter2": "*",
     "debug": "*"
   },
@@ -37,10 +37,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/shokai/node-arduino-firmata.git"
+    "url": "git://github.com/aessig/node-arduino-firmata.git"
   },
   "bugs": {
-    "url": "https://github.com/shokai/node-arduino-firmata/issues"
+    "url": "https://github.com/aessig/node-arduino-firmata/issues"
   },
-  "homepage": "https://github.com/shokai/node-arduino-firmata"
+  "homepage": "https://github.com/aessig/node-arduino-firmata"
 }
