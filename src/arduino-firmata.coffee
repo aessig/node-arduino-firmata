@@ -29,7 +29,6 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
   @REPORT_DIGITAL  = 0xD0 # enable digital input by port
   @SET_PIN_MODE    = 0xF4 # set a pin to INPUT/OUTPUT/PWM/etc
   @REPORT_VERSION  = 0xF9 # report firmware version
-  @REPORT_FIRMWARE = 0x79 # report firmware version
   @SYSTEM_RESET    = 0xFF # reset from MIDI
   @START_SYSEX     = 0xF0 # start a MIDI SysEx message
   @END_SYSEX       = 0xF7 # end a MIDI SysEx message
@@ -86,12 +85,6 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
 
     @serialport = new SerialPort @serialport_name, opts
     @serialport.once 'open', =>
-      cid2 = setInterval =>
-        debug 'request REPORT_FIRMWARE'
-        @write [ArduinoFirmata.REPORT_FIRMWARE]
-      , 500
-      @once 'boardName', (name) =>
-        clearInterval cid2
       cid = setInterval =>
         debug 'request REPORT_VERSION'
         @write [ArduinoFirmata.REPORT_VERSION]
@@ -206,10 +199,8 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
               }
           when ArduinoFirmata.REPORT_VERSION
             @boardVersion = "#{@stored_input_data[1]}.#{@stored_input_data[0]}"
+            @boardName = @stored_input_data[2]
             @emit 'boardVersion', @boardVersion
-          when ArduinoFirmata.REPORT_FIRMWARE
-            @boardName = @stored_input_data[0]
-            @emit 'boardName', @boardName
     else
       if input_data < 0xF0
         command = input_data & 0xF0
@@ -220,7 +211,9 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
         @parsing_sysex = true
         @sysex_bytes_read = 0
       else if command is ArduinoFirmata.DIGITAL_MESSAGE or
-              command is ArduinoFirmata.ANALOG_MESSAGE or
-              command is ArduinoFirmata.REPORT_VERSION
+              command is ArduinoFirmata.ANALOG_MESSAGE
         @wait_for_data = 2
+        @execute_multi_byte_command = command
+      else if command is ArduinoFirmata.REPORT_VERSION
+        @wait_for_data = 3
         @execute_multi_byte_command = command
