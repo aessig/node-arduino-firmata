@@ -29,6 +29,7 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
   @REPORT_DIGITAL  = 0xD0 # enable digital input by port
   @SET_PIN_MODE    = 0xF4 # set a pin to INPUT/OUTPUT/PWM/etc
   @REPORT_VERSION  = 0xF9 # report firmware version
+  @REPORT_FIRMWARE = 0x79 # report firmware
   @SYSTEM_RESET    = 0xFF # reset from MIDI
   @START_SYSEX     = 0xF0 # start a MIDI SysEx message
   @END_SYSEX       = 0xF7 # end a MIDI SysEx message
@@ -87,12 +88,14 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
     @serialport.once 'open', =>
       cid = setInterval =>
         debug 'request REPORT_VERSION'
+        @write [ArduinoFirmata.START_SYSEX, ArduinoFirmata.REPORT_FIRMWARE, ArduinoFirmata.END_SYSEX]
         @write [ArduinoFirmata.REPORT_VERSION]
       , 500
       @once 'boardVersion', (version) =>
-        clearInterval cid
-        @status = ArduinoFirmata.Status.OPEN
-        @emit 'boardReady'
+        @once 'reportFirmware', (name) =>
+          clearInterval cid
+          @status = ArduinoFirmata.Status.OPEN
+          @emit 'boardReady'
       @serialport.on 'data', (data) =>
         for byte in data
           @process_input byte
@@ -162,13 +165,20 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
   analogRead: (pin) ->
     return @analog_input_data[pin]
 
+  queryFirmware: (callback) ->
+    @write [ArduinoFirmata.START_SYSEX, ArduinoFirmata.REPORT_FIRMWARE, ArduinoFirmata.END_SYSEX], callback
+
   process_input: (input_data) ->
     if @parsing_sysex
       if input_data is ArduinoFirmata.END_SYSEX
         @parsing_sysex = false
         sysex_command = @stored_input_data[0]
         sysex_data = @stored_input_data[1...@sysex_bytes_read]
-        @emit 'sysex', {command: sysex_command, data: sysex_data}
+        if sysex_command is ArduinoFirmata.REPORT_FIRMWARE
+          @boardName = sysex_data[1]
+          @emit 'reportFirmware', @boardName
+        else
+          @emit 'sysex', {command: sysex_command, data: sysex_data}
       else
         @stored_input_data[@sysex_bytes_read] = input_data
         @sysex_bytes_read += 1
@@ -199,7 +209,6 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
               }
           when ArduinoFirmata.REPORT_VERSION
             @boardVersion = "#{@stored_input_data[1]}.#{@stored_input_data[0]}"
-            @boardName = @stored_input_data[2]
             @emit 'boardVersion', @boardVersion
     else
       if input_data < 0xF0
@@ -211,9 +220,7 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
         @parsing_sysex = true
         @sysex_bytes_read = 0
       else if command is ArduinoFirmata.DIGITAL_MESSAGE or
-              command is ArduinoFirmata.ANALOG_MESSAGE
+              command is ArduinoFirmata.ANALOG_MESSAGE or
+              command is ArduinoFirmata.REPORT_VERSION
         @wait_for_data = 2
-        @execute_multi_byte_command = command
-      else if command is ArduinoFirmata.REPORT_VERSION
-        @wait_for_data = 3
         @execute_multi_byte_command = command
