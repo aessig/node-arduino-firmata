@@ -7,6 +7,51 @@ debug = require('debug')('arduino-firmata')
 
 exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
 
+  @TRANSLATE = {
+    16: { # __AVR_ATmega1280__ || __AVR_ATmega2560__ --> Arduino Mega
+      A0: 54,
+      A1: 55,
+      A2: 56,
+      A3: 57,
+      A4: 58,
+      A5: 59,
+      A6: 60,
+      A7: 61,
+      A8: 62,
+      A9: 63,
+      A10: 64,
+      A11: 65,
+      A12: 66,
+      A13: 67,
+      A14: 68,
+      A15: 69
+    },
+    32: { # __AVR_ATmega328P__ || __AVR_ATmega168__ --> Arduino Uno
+      A0: 14,
+      A1: 15,
+      A2: 16,
+      A3: 17,
+      A4: 18,
+      A5: 19
+    }
+    48: { # __AVR_ATmega32U4__ || __AVR_ATmega16U4__ --> Arduino Leonardo
+      A0: 18,
+      A1: 19,
+      A2: 20,
+      A3: 21,
+      A4: 22,
+      A5: 23
+    }
+    64: { # undefind ---> Arduino Uno
+      A0: 14,
+      A1: 15,
+      A2: 16,
+      A3: 17,
+      A4: 18,
+      A5: 19
+    }
+  }
+
   @Status = {
     CLOSE: 0
     OPEN: 1
@@ -54,10 +99,16 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
     @digital_input_data  = [0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0]
     @analog_input_data   = [0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0]
     @boardVersion = null
-    @boardName = null
+    @boardName = 0x40
 
   isOldArduinoDevice: ->
     return /usbserial|USB/.test @serialport_name
+
+  trans: (pin)->
+    if typeof pin is 'string' and pin.charAt(0) is 'A'
+      return ArduinoFirmata.TRANSLATE[@boardName][pin]
+    else
+      return pin
 
   connect: (@serialport_name, opts={baudrate: 57600}) ->
     opts.parser = serialport.parsers.raw
@@ -125,6 +176,7 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
     @write write_data, callback
 
   pinMode: (pin, mode, callback) ->
+    pin = @trans pin # Pin translation
     switch mode
       when true
         mode = ArduinoFirmata.OUTPUT
@@ -133,7 +185,7 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
     @write [ArduinoFirmata.SET_PIN_MODE, pin, mode], callback
 
   digitalWrite: (pin, value, callback) ->
-    @pinMode pin, ArduinoFirmata.OUTPUT
+    # @pinMode pin, ArduinoFirmata.OUTPUT
     port_num = (pin >>> 3) & 0x0F
     if value is 0 or value is false
       @digital_output_data[port_num] &= ~(1 << (pin & 0x07))
@@ -146,14 +198,14 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
 
   analogWrite: (pin, value, callback) ->
     value = Math.floor value
-    @pinMode pin, ArduinoFirmata.PWM
+    # @pinMode pin, ArduinoFirmata.PWM
     @write [ (ArduinoFirmata.ANALOG_MESSAGE | (pin & 0x0F)),
              (value & 0x7F),
              (value >>> 7) ],
            callback
 
   servoWrite: (pin, angle, callback) ->
-    @pinMode pin, ArduinoFirmata.SERVO
+    # @pinMode pin, ArduinoFirmata.SERVO
     @write [ (ArduinoFirmata.ANALOG_MESSAGE | (pin & 0x0F)),
              (angle & 0x7F),
              (angle >>> 7) ],
