@@ -58,6 +58,7 @@ exports = module.exports = class ArduinoFirmata extends events.EventEmitter2
   }
 
   @INPUT  = 0
+  @FIRMATA_INPUT_PULLUP = 0x10
   @OUTPUT = 1
   @ANALOG = 2
   @PWM    = 3
